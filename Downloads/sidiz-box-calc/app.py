@@ -24,7 +24,10 @@ def get_mat(code):
     return r.iloc[0] if len(r) > 0 else None
 
 def calc_outer(L, W, H, thick):
-    return L + thick * 2, W + thick * 2, H + thick * 3
+    if thick >= 6:  # DW (BA/BB골) - 실측 기반 보정
+        return L + 4, W + 4, H + 10
+    else:  # SW - KS 이론값 유지
+        return L + thick * 2, W + thick * 2, H + thick * 3
 
 def calc_theo(L, W, H, mat, box_kind, process, box_subtype="A표준형"):
     t, thr = mat["골두께"], mat["소대경계"]
@@ -93,6 +96,10 @@ st.markdown("")
 
 def render_result(L, W, H, t, mat, box_kind=None, process=None, subtype=None):
     oL, oW, oH = calc_outer(L, W, H, t)
+    is_dw = t >= 6
+    corrLW = oL - L
+    corrH = oH - H
+    corrNote = "DW 실측 기반" if is_dw else f"t×2, t×3"
     st.markdown('<div class="section-label">📊 계산 결과</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
@@ -101,13 +108,17 @@ def render_result(L, W, H, t, mat, box_kind=None, process=None, subtype=None):
         st.markdown(f'<div class="result-box"><div class="label">외경 사이즈</div><div class="value">{oL:.1f} × {oW:.1f} × {oH:.1f}</div><div class="sub">L × W × H (mm) · {mat["골종"]}골 {t}mm</div></div>', unsafe_allow_html=True)
     st.markdown("")
     st.markdown(f'<div class="section-label">📐 상세 계산 근거</div>', unsafe_allow_html=True)
-    st.markdown(f"""<table class="detail-table"><thead><tr><th>항목</th><th>내경(mm)</th><th>골두께 보정</th><th>외경(mm)</th></tr></thead><tbody>
-    <tr><td>가로(L)</td><td class="num">{L:.0f}</td><td class="correction">+{t*2:.1f} <span style="color:#94a3b8;font-weight:400">(t×2)</span></td><td class="num highlight">{oL:.1f}</td></tr>
-    <tr><td>세로(W)</td><td class="num">{W:.0f}</td><td class="correction">+{t*2:.1f} <span style="color:#94a3b8;font-weight:400">(t×2)</span></td><td class="num highlight">{oW:.1f}</td></tr>
-    <tr><td>높이(H)</td><td class="num">{H:.0f}</td><td class="correction">+{t*3:.1f} <span style="color:#94a3b8;font-weight:400">(t×3 벽면2+플랩1)</span></td><td class="num highlight">{oH:.1f}</td></tr>
+    st.markdown(f"""<table class="detail-table"><thead><tr><th>항목</th><th>내경(mm)</th><th>외경 보정</th><th>외경(mm)</th></tr></thead><tbody>
+    <tr><td>가로(L)</td><td class="num">{L:.0f}</td><td class="correction">+{corrLW:.1f} <span style="color:#94a3b8;font-weight:400">({corrNote})</span></td><td class="num highlight">{oL:.1f}</td></tr>
+    <tr><td>세로(W)</td><td class="num">{W:.0f}</td><td class="correction">+{corrLW:.1f} <span style="color:#94a3b8;font-weight:400">({corrNote})</span></td><td class="num highlight">{oW:.1f}</td></tr>
+    <tr><td>높이(H)</td><td class="num">{H:.0f}</td><td class="correction">+{corrH:.1f} <span style="color:#94a3b8;font-weight:400">({corrNote})</span></td><td class="num highlight">{oH:.1f}</td></tr>
     </tbody></table>""", unsafe_allow_html=True)
     st.markdown("")
-    st.markdown(f'<div class="formula-block"><span class="hi">외경(L)</span> = {L:.0f} + {t}×2 = <span class="result">{oL:.1f}</span> · <span class="hi">외경(W)</span> = {W:.0f} + {t}×2 = <span class="result">{oW:.1f}</span> · <span class="hi">외경(H)</span> = {H:.0f} + {t}×3 = <span class="result">{oH:.1f}</span> <span style="color:#94a3b8;">← 벽면2+플랩1</span></div>', unsafe_allow_html=True)
+    # 공식 블록: 이론값(취소선) + 실측 적용값
+    if is_dw:
+        st.markdown(f'<div class="formula-block"><span style="color:#94a3b8;text-decoration:line-through;">이론: 외경L = {L:.0f}+{t}×2 = {L+t*2:.1f} · 외경W = {W:.0f}+{t}×2 = {W+t*2:.1f} · 외경H = {H:.0f}+{t}×3 = {H+t*3:.1f}</span><br><span class="hi">적용:</span> <span class="result">외경L = {L:.0f}+{corrLW:.1f} = {oL:.1f}</span> · <span class="result">외경W = {W:.0f}+{corrLW:.1f} = {oW:.1f}</span> · <span class="result">외경H = {H:.0f}+{corrH:.1f} = {oH:.1f}</span> <span style="color:#94a3b8;">← DW 실측기반 보정</span></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="formula-block"><span class="hi">외경(L)</span> = {L:.0f} + {t}×2 = <span class="result">{oL:.1f}</span> · <span class="hi">외경(W)</span> = {W:.0f} + {t}×2 = <span class="result">{oW:.1f}</span> · <span class="hi">외경(H)</span> = {H:.0f} + {t}×3 = <span class="result">{oH:.1f}</span> <span style="color:#94a3b8;">← SW 이론값</span></div>', unsafe_allow_html=True)
     st.markdown("")
     sum3 = (oL + oW + oH) / 10
     if sum3 > 160: st.error(f"⚠️ **3변합 {sum3:.1f}cm** — 택배 과대 사이즈")
@@ -189,13 +200,58 @@ with tab3:
         c2.download_button("📥 CSV", mats_df.to_csv(index=False, encoding="utf-8-sig"), "materials.csv", "text/csv", use_container_width=True)
 
 with tab4:
-    st.markdown('<div class="card"><div class="card-title"><div class="icon" style="background:#fce7f3;color:#db2777;">📖</div> KS 규격 참조 문서</div><p style="font-size:.75rem;color:#64748b;margin:0;">FP-KS-REF-001 · Rev.1.0 · 2026-03-24 · 시디즈 생산팀 · 실데이터 1,813건 기반</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="card"><div class="card-title"><div class="icon" style="background:#fce7f3;color:#db2777;">📖</div> KS 규격 참조 문서</div><p style="font-size:.75rem;color:#64748b;margin:0;">FP-KS-REF-001 · Rev.1.1 · 2026-03-25 · 시디즈 생산팀 · 실데이터 1,813건 + 실측 5건 기반</p></div>', unsafe_allow_html=True)
     st.markdown("#### 1. 참조 규격")
     st.dataframe(pd.DataFrame({"규격번호":["KS T 1034","KS A 1003","KS T 1061","KS M 7063","FEFCO/ESBO"],"규격명":["골판지 포장 상자","골판지 상자의 형식","수출용 골판지 상자","골판지 원지","국제 골판지 상자 형식"],"제정/개정":["2019 확인"]*3+["—"]*2,"비고":["치수 허용차","형식 코드","수출 포장","라이너·골심지","국제 표준"]}), use_container_width=True, hide_index=True)
     st.markdown("#### 2. 골종별 두께")
     st.dataframe(pd.DataFrame({"골종":["A골","B골","C골","E골","F골","BA골","BB골","EB골"],"구분":["SW"]*5+["DW"]*3,"골높이(mm)":["4.5~4.8","2.5~2.8","3.5~3.8","1.1~1.4","0.6~0.8","7.0~8.0","5.0~5.6","3.6~4.2"],"두께(mm)":["약5.0","약3.0","약4.0","약1.5","약0.8","약8.0","약6.0","약4.5"],"적용":["~10kg","~5kg","~10kg","~3kg","~1kg","10kg+","8kg+","8kg+"]}), use_container_width=True, hide_index=True)
-    st.markdown("#### 3. 외경 공식")
-    st.markdown("| 항목 | 계산식 | 비고 |\n|------|--------|------|\n| **외경(L)** | 내경L + 골두께×2 | 좌우 벽면 각 1겹 |\n| **외경(W)** | 내경W + 골두께×2 | 전후 벽면 각 1겹 |\n| **외경(H)** | 내경H + 골두께×3 | 벽면2+플랩1 |\n\n> ✅ 외경은 박스유형(A표준/A1/A2)에 무관하게 동일")
+
+    st.markdown("#### 3. 외경 계산 공식")
+    st.markdown("""
+**골판지 원단 두께 ≠ 조립 후 외경 증가분**
+
+골판지 원단 두께(예: DW BA골 ~8mm)는 시트 상태의 두께이며,
+박스 조립 시 괘선(접힘선)에서 골이 눌리고 밀착되므로
+실제 외경 증가분은 원단 두께보다 작습니다.
+
+아래 보정값은 **시디즈 평택공장 실측 데이터(2026.03)**를 기반으로 산출하였습니다.
+
+**DW (이중양면골판지: BA골, BB골) — 실측 기반**
+
+| 항목 | 보정값 | 산출 근거 |
+|------|--------|----------|
+| **외경(L)** | 내경(L) **+ 4mm** | 실측 5건 평균 +3.3mm → 여유 포함 +4mm |
+| **외경(W)** | 내경(W) **+ 4mm** | 실측 5건 평균 +2.0mm → 여유 포함 +4mm |
+| **외경(H)** | 내경(H) **+ 10mm** | 실측 5건 일관 +10~12mm → +10mm 적용 |
+
+**SW (양면골판지: A골, B골, E골) — KS 이론값 (추후 실측 검증 예정)**
+
+| 항목 | 보정값 | 비고 |
+|------|--------|------|
+| **외경(L)** | 내경(L) + 골두께 × 2 | 좌우 벽면 각 1겹 |
+| **외경(W)** | 내경(W) + 골두께 × 2 | 전후 벽면 각 1겹 |
+| **외경(H)** | 내경(H) + 골두께 × 3 | 벽면 2겹 + 상부 플랩 1겹 |
+
+> ✅ 외경은 박스유형(A표준/A1/A2)에 무관하게 동일 공식 적용
+    """)
+
+    st.markdown("#### 3-1. DW 실측 상세 데이터 (2026.03.25)")
+    st.dataframe(pd.DataFrame({
+        "자재코드": ["PPBX018075", "PPBX014058", "PPGPBX0019558", "PPBX012765", "C41-6B-50042"],
+        "자재명": ["T61 포장박스", "T40 FKD 포장박스", "완조립 660×650", "TN503F SKD", "T500 팔걸이"],
+        "유형": ["A표준", "A표준", "A1형", "A표준", "A표준"],
+        "내경L": [705, 700, 660, 730, 700],
+        "내경W": [615, 675, 650, 680, 675],
+        "내경H": [850, 350, 950, 635, 440],
+        "실측L": [710, 703, 659, 732, 722],
+        "실측W": [615, 680, 660, 680, 678],
+        "실측H": [860, 360, 960, 645, 452],
+        "L보정": ["+5", "+3", "-1", "+2", "+22*"],
+        "W보정": ["+0", "+5", "+10", "+0", "+3"],
+        "H보정": ["+10", "+10", "+10", "+10", "+12"],
+    }), use_container_width=True, hide_index=True)
+    st.caption("※ C41-6B-50042 L+22는 이상치(실측 오차 가능성). 이를 제외한 L 평균 = +3.3mm")
+
     st.markdown("#### 4. 이론장 보정")
     st.markdown("`이론장 = (L+W)×2 + 보정값`")
     st.dataframe(pd.DataFrame({"벽체":["DW","DW","SW","SW"],"가공":["일반","톰슨","일반","톰슨"],"소형(mm)":["+76","+116","+64","+104"],"대형(mm)":["+116","+156","+104","+144"],"경계":["2,440mm"]*2+["2,500mm"]*2}), use_container_width=True, hide_index=True)
@@ -212,7 +268,7 @@ with tab4:
     st.markdown("- **KS 개정 시:** 이 탭 + 🏭 마스터 갱신\n- **원자재 변경:** 🏭 탭 수정\n- **자재코드 갱신:** 태블로→PA→n8n→GitHub→자동배포")
     st.error("⚠️ KS 개정 시 이 문서 + 마스터를 함께 갱신하세요.")
     st.markdown("#### 9. 개정이력")
-    st.dataframe(pd.DataFrame({"Rev":["1.0"],"일자":["2026-03-24"],"내용":["최초 작성. 실데이터 1,813건 기반."],"작성":["시디즈 생산팀"]}), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame({"Rev":["1.0","1.1"],"일자":["2026-03-24","2026-03-25"],"내용":["최초 작성. 실데이터 1,813건 기반.","DW 외경 보정값 실측 검증 반영 (5건). L,W +4mm / H +10mm. KS 규격 참조 상세화."],"작성":["시디즈 생산팀","시디즈 생산팀"]}), use_container_width=True, hide_index=True)
 
 with st.sidebar:
     st.markdown("### 📦 시디즈 생산팀")
@@ -222,4 +278,4 @@ with st.sidebar:
     st.metric("원자재 마스터", f"{len(mats_df)}종")
     st.divider()
     st.caption("태블로→PA→n8n→GitHub→Streamlit")
-    st.caption("FP-KS-REF-001 Rev.1.0")
+    st.caption("FP-KS-REF-001 Rev.1.1")
